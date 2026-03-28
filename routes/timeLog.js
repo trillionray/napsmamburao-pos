@@ -2,7 +2,7 @@
 const express = require("express");
 const router = express.Router();
 
-const timelogController = require("../controllers/timelog");
+const timelogController = require("../controllers/timeLog");
 const auth = require("../auth");
 
 const { verify, verifyAdmin } = auth;
