@@ -2,74 +2,45 @@ const TimeLog = require("../models/TimeLog");
 
 module.exports.timeIn = async (req, res) => {
   try {
-    const userId = req.user.id; // from auth middleware
+    const userId = req.user?.id;
 
-    // find active log (timeIn exists but timeOut not set)
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const tasks = Array.isArray(req.body?.tasks) ? req.body.tasks : [];
+
     const activeLog = await TimeLog.findOne({
       userId,
-      timeOut: { $exists: false }
+      timeOut: null
     });
 
     if (activeLog) {
-      // user already clocked in and not yet clocked out
       return res.status(400).json({
         message: "User already clocked in."
       });
     }
 
-    // create new log for this time-in
     const newLog = await TimeLog.create({
       userId,
-      timeIn: new Date()
+      timeIn: new Date(),
+      tasks
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "Clock In successful",
       timelog: newLog
     });
+
   } catch (error) {
-    res.status(500).json({
+    console.error("TIME IN ERROR:", error); // 🔥 important
+    return res.status(500).json({
       message: "Time in failed",
       error: error.message
     });
   }
 };
 
-
-module.exports.timeIn = async (req, res) => {
-  try {
-    const userId = req.user.id; // from auth middleware
-
-    // find active log (timeIn exists but timeOut not set)
-    const activeLog = await TimeLog.findOne({
-      userId,
-      timeOut: { $exists: false }
-    });
-
-    if (activeLog) {
-      // user already clocked in and not yet clocked out
-      return res.status(400).json({
-        message: "User already clocked in."
-      });
-    }
-
-    // create new log for this time-in
-    const newLog = await TimeLog.create({
-      userId,
-      timeIn: new Date()
-    });
-
-    res.status(201).json({
-      message: "Clock In successful",
-      timelog: newLog
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Time in failed",
-      error: error.message
-    });
-  }
-};
 
 
 module.exports.timeOut = async (req, res) => {
@@ -168,6 +139,50 @@ module.exports.getAllTimeLogs = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Failed to fetch time logs",
+      error: error.message
+    });
+  }
+};
+
+
+module.exports.updateTasks = async (req, res) => {
+  try {
+    const { timelogId } = req.params;
+    const { tasks } = req.body;
+
+    if (!Array.isArray(tasks)) {
+      return res.status(400).json({
+        message: "Tasks must be an array"
+      });
+    }
+
+    const timelog = await TimeLog.findById(timelogId);
+
+    if (!timelog) {
+      return res.status(404).json({
+        message: "Time log not found"
+      });
+    }
+
+    // optional: prevent editing if already clocked out
+    if (timelog.timeOut) {
+      return res.status(400).json({
+        message: "Cannot edit tasks after clock out"
+      });
+    }
+
+    timelog.tasks = tasks;
+    await timelog.save();
+
+    return res.status(200).json({
+      message: "Tasks updated successfully",
+      timelog
+    });
+
+  } catch (error) {
+    console.error("UPDATE TASKS ERROR:", error);
+    return res.status(500).json({
+      message: "Failed to update tasks",
       error: error.message
     });
   }

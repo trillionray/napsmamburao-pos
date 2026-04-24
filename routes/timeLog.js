@@ -23,6 +23,7 @@ router.get("/all", verify, verifyAdmin, timelogController.getAllTimeLogs);
 // User: get own logs
 router.get("/my", verify, timelogController.getMyTimeLogs);
 
+router.patch("/:timelogId/tasks", verify, timelogController.updateTasks);
 
 // [SECTION] Export the router so it can be used in app.js
 module.exports = router;
