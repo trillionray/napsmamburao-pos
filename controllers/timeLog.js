@@ -41,8 +41,6 @@ module.exports.timeIn = async (req, res) => {
   }
 };
 
-
-
 module.exports.timeOut = async (req, res) => {
   try {
     const timelog = await TimeLog.findOne({
@@ -76,9 +74,6 @@ module.exports.timeOut = async (req, res) => {
   }
 };
 
-
-
-
 module.exports.markAsPaid = async (req, res) => {
   try {
     const { timelogId } = req.params;
@@ -107,7 +102,6 @@ module.exports.markAsPaid = async (req, res) => {
   }
 };
 
-
 module.exports.getMyTimeLogs = async (req, res) => {
   try {
     const timelogs = await TimeLog.find({
@@ -125,8 +119,6 @@ module.exports.getMyTimeLogs = async (req, res) => {
   }
 };
 
-
-
 module.exports.getAllTimeLogs = async (req, res) => {
   try {
     const timelogs = await TimeLog.find()
@@ -143,7 +135,6 @@ module.exports.getAllTimeLogs = async (req, res) => {
     });
   }
 };
-
 
 module.exports.updateTasks = async (req, res) => {
   try {
@@ -183,6 +174,101 @@ module.exports.updateTasks = async (req, res) => {
     console.error("UPDATE TASKS ERROR:", error);
     return res.status(500).json({
       message: "Failed to update tasks",
+      error: error.message
+    });
+  }
+};
+
+module.exports.updateTimeLog = async (req, res) => {
+  try {
+    const { timelogId } = req.params;
+    const { timeIn, timeOut, tasks } = req.body;
+
+    const timelog = await TimeLog.findById(timelogId);
+
+    if (!timelog) {
+      return res.status(404).json({
+        message: "Time log not found"
+      });
+    }
+
+    // ❌ Prevent editing paid logs
+    if (timelog.isPaid) {
+      return res.status(400).json({
+        message: "Cannot edit a paid time log"
+      });
+    }
+
+    // ✅ Safely parse dates
+    let parsedTimeIn = timelog.timeIn;
+    let parsedTimeOut = timelog.timeOut;
+
+    if (timeIn) {
+      const d = new Date(timeIn);
+      if (isNaN(d)) {
+        return res.status(400).json({
+          message: "Invalid timeIn format"
+        });
+      }
+      parsedTimeIn = d;
+    }
+
+    if (timeOut) {
+      const d = new Date(timeOut);
+      if (isNaN(d)) {
+        return res.status(400).json({
+          message: "Invalid timeOut format"
+        });
+      }
+      parsedTimeOut = d;
+    }
+
+    // ✅ Validate time order
+    if (parsedTimeOut && parsedTimeOut < parsedTimeIn) {
+      return res.status(400).json({
+        message: "timeOut cannot be earlier than timeIn"
+      });
+    }
+
+    // ✅ Apply updates
+    timelog.timeIn = parsedTimeIn;
+    timelog.timeOut = parsedTimeOut;
+
+    // ✅ Update tasks
+    if (tasks !== undefined) {
+      if (!Array.isArray(tasks)) {
+        return res.status(400).json({
+          message: "Tasks must be an array"
+        });
+      }
+      timelog.tasks = tasks;
+    }
+
+    // ✅ Recompute totalTime
+    if (timelog.timeIn && timelog.timeOut) {
+      const durationHours =
+        (timelog.timeOut - timelog.timeIn) / 1000 / 60 / 60;
+
+      timelog.totalTime = parseFloat(durationHours.toFixed(4));
+    } else {
+      timelog.totalTime = null;
+    }
+
+    // ✅ Audit trail (optional but recommended)
+    timelog.editedBy = req.user.id;
+    timelog.editedAt = new Date();
+
+    await timelog.save();
+
+    res.status(200).json({
+      message: "Time log updated successfully",
+      timelog
+    });
+
+  } catch (error) {
+    console.error("UPDATE TIMELOG ERROR:", error);
+    res.status(500).json({
+      message: "Failed to update timelog",
       error: error.message
     });
   }
