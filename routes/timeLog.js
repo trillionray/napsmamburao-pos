@@ -26,5 +26,22 @@ router.get("/my", verify, timelogController.getMyTimeLogs);
 router.patch("/:timelogId/tasks", verify, timelogController.updateTasks);
 
 router.put("/:timelogId", verify, verifyAdmin, timelogController.updateTimeLog);
+
+// 👤 User: file correction
+router.patch(
+  "/:timelogId/file-correction",
+  verify,
+  timelogController.fileTimeCorrection
+);
+
+// 👨‍💼 Admin: approve / disapprove correction
+router.patch(
+  "/:timelogId/handle-correction",
+  verify,
+  verifyAdmin,
+  timelogController.handleTimeCorrection
+);
+
+
 // [SECTION] Export the router so it can be used in app.js
 module.exports = router;

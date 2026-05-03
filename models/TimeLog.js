@@ -11,7 +11,12 @@ const timelogSchema = new mongoose.Schema(
     timeOut: { type: Date, required: false },
     totalTime: { type: Number }, // computed on clock-out
     isPaid: { type: Boolean, default: false },
-    tasks: [{ type: String, default: [] }] // <-- added field
+    tasks: [{ type: String, default: [] }],
+    correctionStatus: {
+      type: String,
+      enum: ["none", "filed", "approved", "disapproved"],
+      default: "none"
+    },
   },
   { timestamps: true }
 );

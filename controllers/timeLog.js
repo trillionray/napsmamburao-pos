@@ -273,3 +273,101 @@ module.exports.updateTimeLog = async (req, res) => {
     });
   }
 };
+
+
+module.exports.fileTimeCorrection = async (req, res) => {
+  try {
+    const { timelogId } = req.params;
+
+    const timelog = await TimeLog.findById(timelogId);
+
+    if (!timelog) {
+      return res.status(404).json({
+        message: "Time log not found"
+      });
+    }
+
+    // ❌ Prevent filing if already paid
+    if (timelog.isPaid) {
+      return res.status(400).json({
+        message: "Cannot file correction for paid log"
+      });
+    }
+
+    // ❌ Prevent duplicate filing
+    if (timelog.correctionStatus === "filed") {
+      return res.status(400).json({
+        message: "Correction already filed"
+      });
+    }
+
+    timelog.correctionStatus = "filed";
+    await timelog.save();
+
+    res.status(200).json({
+      message: "Time correction filed",
+      timelog
+    });
+
+  } catch (error) {
+    console.error("FILE CORRECTION ERROR:", error);
+    res.status(500).json({
+      message: "Failed to file correction",
+      error: error.message
+    });
+  }
+};
+
+
+module.exports.handleTimeCorrection = async (req, res) => {
+  try {
+    const { timelogId } = req.params;
+    const { status } = req.body; // expected: "approved" or "disapproved"
+
+    // ✅ Validate input
+    if (!["approved", "disapproved"].includes(status)) {
+      return res.status(400).json({
+        message: "Invalid status. Must be 'approved' or 'disapproved'"
+      });
+    }
+
+    const timelog = await TimeLog.findById(timelogId);
+
+    if (!timelog) {
+      return res.status(404).json({
+        message: "Time log not found"
+      });
+    }
+
+    // ❌ Must have a filed request first
+    if (timelog.correctionStatus !== "filed") {
+      return res.status(400).json({
+        message: "No pending correction to process"
+      });
+    }
+
+    // ❌ Prevent approving paid logs (optional but recommended)
+    if (timelog.isPaid) {
+      return res.status(400).json({
+        message: "Cannot process correction for paid log"
+      });
+    }
+
+    // ✅ Apply status
+    timelog.correctionStatus = status;
+
+    await timelog.save();
+
+    res.status(200).json({
+      message: `Time correction ${status}`,
+      timelog
+    });
+
+  } catch (error) {
+    console.error("HANDLE CORRECTION ERROR:", error);
+    res.status(500).json({
+      message: "Failed to process correction",
+      error: error.message
+    });
+  }
+};
