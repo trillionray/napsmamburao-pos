@@ -42,6 +42,8 @@ router.delete("/:orderId", verify, verifyAdmin, orderController.removeOrder);
 
 router.patch("/:orderId/bill", verify, orderController.markAsBilled);
 
+router.put("/:orderId/discount", verify, orderController.applyDiscount);
+
 // ==============================
 // EXPORT ROUTER
 // ==============================

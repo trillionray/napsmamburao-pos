@@ -1,9 +1,33 @@
 const Order = require("../models/Order");
 
+
+const computeBill = (order) => {
+  const subtotal = order.ordered.reduce((sum, item) => {
+    return sum + (item.price || 0) * (item.quantity || 0);
+  }, 0);
+
+  const pax = order.pax || 1;
+  const discountedPax = order.discountedPax || 0;
+  const discountRate = order.discount || 0; // percent
+
+  const perHead = subtotal / pax;
+  const discountBase = perHead * discountedPax;
+  const discountAmount = discountBase * (discountRate / 100);
+
+  const grandTotal = subtotal - discountAmount;
+
+  return {
+    subtotal,
+    discount: discountAmount,
+    grandTotal,
+  };
+};
+
+
 // ==============================
 // 1. CREATE ORDER
 // ==============================
-exports.createOrder = async (req, res) => {
+module.exports.createOrder = async (req, res) => {
   try {
     const { staffName, orderName, serviceType } = req.body;
 
@@ -18,7 +42,9 @@ exports.createOrder = async (req, res) => {
       orderName,
       serviceType,
       ordered: [],
-      total: 0,
+      subtotal: 0,
+      discount: 0,
+      grandTotal: 0,
     });
 
     const savedOrder = await newOrder.save();
@@ -65,9 +91,11 @@ module.exports.addToOrder = async (req, res) => {
     }
 
     // recompute total
-    order.total = order.ordered.reduce((sum, item) => {
-      return sum + (Number(item.price) || 0) * (Number(item.quantity) || 0);
-    }, 0);
+    const bill = computeBill(order);
+
+    order.subtotal = bill.subtotal;
+    order.discount = bill.discount;
+    order.grandTotal = bill.grandTotal;
 
     const updatedOrder = await order.save();
 
@@ -83,7 +111,7 @@ module.exports.addToOrder = async (req, res) => {
 module.exports.updateOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { ordered, serviceDetails } = req.body;
+    const { ordered, serviceDetails, pax, discountedPax, discount } = req.body;
 
     const order = await Order.findById(orderId);
 
@@ -91,20 +119,23 @@ module.exports.updateOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (ordered) {
-      order.ordered = ordered;
-
-      order.total = order.ordered.reduce((sum, item) => {
-        return sum + (Number(item.price) || 0) * (Number(item.quantity) || 0);
-      }, 0);
-    }
-
+    if (ordered) order.ordered = ordered;
     if (serviceDetails) {
       order.serviceDetails = {
         ...order.serviceDetails,
         ...serviceDetails,
       };
     }
+
+    if (pax !== undefined) order.pax = pax;
+    if (discountedPax !== undefined) order.discountedPax = discountedPax;
+    if (discount !== undefined) order.discount = discount;
+
+    const bill = computeBill(order);
+
+    order.subtotal = bill.subtotal;
+    order.discount = bill.discount;
+    order.grandTotal = bill.grandTotal;
 
     const updatedOrder = await order.save();
 
@@ -113,7 +144,6 @@ module.exports.updateOrder = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
 // ==============================
 // 4. UPDATE ITEM QUANTITY (CORE LOGIC)
 // ==============================
@@ -150,11 +180,11 @@ module.exports.updateItemQuantity = async (req, res) => {
     // ==============================
     // RECOMPUTE TOTAL FROM SCRATCH
     // ==============================
-    order.total = order.ordered.reduce((sum, item) => {
-      const price = Number(item.price) || 0;
-      const qty = Number(item.quantity) || 0;
-      return sum + price * qty;
-    }, 0);
+    const bill = computeBill(order);
+
+    order.subtotal = bill.subtotal;
+    order.discount = bill.discount;
+    order.grandTotal = bill.grandTotal;
 
     const updatedOrder = await order.save();
 
@@ -242,6 +272,53 @@ module.exports.markAsBilled = async (req, res) => {
     const updatedOrder = await order.save();
 
     return res.status(200).json(updatedOrder);
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+module.exports.applyDiscount = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { pax, discountedPax, discount } = req.body;
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // ==============================
+    // SAFE INPUTS
+    // ==============================
+    order.pax = Math.max(Number(pax) || 1, 1);
+    order.discountedPax = Math.max(Number(discountedPax) || 0, 0);
+    order.discount = Math.max(Number(discount) || 0, 0);
+
+    // ==============================
+    // COMPUTE SUBTOTAL
+    // ==============================
+    const subtotal = order.ordered.reduce((sum, item) => {
+      return sum + (Number(item.price) || 0) * (Number(item.quantity) || 0);
+    }, 0);
+
+    // ==============================
+    // PER-HEAD COMPUTATION
+    // ==============================
+    const perHead = subtotal / order.pax;
+
+    const discountBase = perHead * order.discountedPax;
+    const discountAmount = discountBase * (order.discount / 100);
+
+    // ==============================
+    // FINAL BILL
+    // ==============================
+    order.subtotal = subtotal;
+    order.grandTotal = subtotal - discountAmount;
+
+    const updated = await order.save();
+
+    return res.status(200).json(updated);
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }

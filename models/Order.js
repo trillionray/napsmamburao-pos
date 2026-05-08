@@ -18,31 +18,48 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
-    serviceDetails: {
-      address: String,
-      contactNumber: String,
-      tableNumber: Number,
-      reservationDate: Date,
-      pax: Number,
-      notes: String,
-    },
-
     ordered: [
       {
         productName: String,
         quantity: Number,
-        price: Number, // snapshot price
+        price: Number,
       },
     ],
 
-    total: {
+    // ✅ RAW TOTAL BEFORE DISCOUNT
+    subtotal: {
       type: Number,
       default: 0,
     },
+
+    pax: {
+      type: Number,
+      default: 1,
+    },
+
+    discountedPax: {
+      type: Number,
+      default: 0,
+    },
+
+    discount: {
+      type: Number,
+      default: 0,
+    },
+
+    grandTotal: {
+      type: Number,
+      default: 0,
+    },
+
     status: {
       type: String,
-      enum: ["pending",  "billed", "cancelled"],
+      enum: ["pending", "billed", "cancelled"],
       default: "pending",
+    },
+
+    notes: {
+      type: String,
     },
   },
   { timestamps: true }
