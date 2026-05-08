@@ -29,7 +29,7 @@ const computeBill = (order) => {
 // ==============================
 module.exports.createOrder = async (req, res) => {
   try {
-    const { staffName, orderName, serviceType } = req.body;
+    const { staffName, orderName, serviceType, pax } = req.body;
 
     if (!staffName || !orderName || !serviceType) {
       return res.status(400).json({
@@ -45,6 +45,7 @@ module.exports.createOrder = async (req, res) => {
       subtotal: 0,
       discount: 0,
       grandTotal: 0,
+      pax
     });
 
     const savedOrder = await newOrder.save();
