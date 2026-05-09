@@ -8,25 +8,28 @@ const computeBill = (order) => {
 
   const pax = order.pax || 1;
   const discountedPax = order.discountedPax || 0;
-  const discountRate = order.discount || 0; // percent
+  const discountRate = order.discount || 0;
 
   const perHead = subtotal / pax;
+
   const discountBase = perHead * discountedPax;
   const discountAmount = discountBase * (discountRate / 100);
 
   const grandTotal = subtotal - discountAmount;
 
+  const cash = Number(order.cash || 0);
+  const change = cash - grandTotal;
+
   return {
     subtotal,
     discount: discountAmount,
     grandTotal,
+    cash,
+    change,
   };
 };
 
 
-// ==============================
-// 1. CREATE ORDER
-// ==============================
 module.exports.createOrder = async (req, res) => {
   try {
     const { staffName, orderName, serviceType, pax } = req.body;
@@ -56,9 +59,6 @@ module.exports.createOrder = async (req, res) => {
   }
 };
 
-// ==============================
-// 2. ADD PRODUCT TO ORDER
-// ==============================
 module.exports.addToOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -106,9 +106,6 @@ module.exports.addToOrder = async (req, res) => {
   }
 };
 
-// ==============================
-// 3. UPDATE ORDER (FULL REPLACE)
-// ==============================
 module.exports.updateOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -145,9 +142,7 @@ module.exports.updateOrder = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-// ==============================
-// 4. UPDATE ITEM QUANTITY (CORE LOGIC)
-// ==============================
+
 module.exports.updateItemQuantity = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -195,9 +190,6 @@ module.exports.updateItemQuantity = async (req, res) => {
   }
 };
 
-// ==============================
-// 5. DELETE ORDER
-// ==============================
 module.exports.removeOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -216,9 +208,6 @@ module.exports.removeOrder = async (req, res) => {
   }
 };
 
-// ==============================
-// 6. GET ALL ORDERS
-// ==============================
 module.exports.getAllOrders = async (req, res) => {
   try {
     const orders = await Order.find().sort({ createdAt: -1 });
@@ -254,6 +243,7 @@ module.exports.getOrder = async (req, res) => {
 module.exports.markAsBilled = async (req, res) => {
   try {
     const { orderId } = req.params;
+    const { cash } = req.body;
 
     const order = await Order.findById(orderId);
 
@@ -261,18 +251,24 @@ module.exports.markAsBilled = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // optional: prevent re-billing
-    // if (order.status === "billed") {
-    //   return res.status(400).json({
-    //     message: "Order is already billed",
-    //   });
-    // }
+    // save cash
+    order.cash = Number(cash || 0);
+
+    // recompute bill
+    const bill = computeBill(order);
+
+    order.subtotal = bill.subtotal;
+    order.grandTotal = bill.grandTotal;
 
     order.status = "billed";
 
     const updatedOrder = await order.save();
 
-    return res.status(200).json(updatedOrder);
+    return res.status(200).json({
+      ...updatedOrder.toObject(),
+      change: bill.change,
+    });
+
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }

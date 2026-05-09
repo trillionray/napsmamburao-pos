@@ -38,7 +38,7 @@ router.put(
 // ==============================
 // DELETE ORDER
 // ==============================
-router.delete("/:orderId", verify, verifyAdmin, orderController.removeOrder);
+router.delete("/:orderId", verify, orderController.removeOrder);
 
 router.patch("/:orderId/bill", verify, orderController.markAsBilled);
 
