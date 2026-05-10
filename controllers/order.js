@@ -2,33 +2,29 @@ const Order = require("../models/Order");
 
 
 const computeBill = (order) => {
-  const subtotal = order.ordered.reduce((sum, item) => {
-    return sum + (item.price || 0) * (item.quantity || 0);
+  const ordered = Array.isArray(order.ordered) ? order.ordered : [];
+
+  const subtotal = ordered.reduce((sum, item) => {
+    return sum + (Number(item.price) || 0) * (Number(item.quantity) || 0);
   }, 0);
 
-  const pax = order.pax || 1;
-  const discountedPax = order.discountedPax || 0;
-  const discountRate = order.discount || 0;
+  const pax = Number(order.pax || 1);
+  const discountedPax = Number(order.discountedPax || 0);
+  const discountRate = Number(order.discount || 0);
 
-  const perHead = subtotal / pax;
-
+  const perHead = pax > 0 ? subtotal / pax : 0;
   const discountBase = perHead * discountedPax;
+
   const discountAmount = discountBase * (discountRate / 100);
 
   const grandTotal = subtotal - discountAmount;
 
-  const cash = Number(order.cash || 0);
-  const change = cash - grandTotal;
-
   return {
     subtotal,
-    discount: discountAmount,
     grandTotal,
-    cash,
-    change,
+    discountAmount, // 👈 ADD THIS
   };
 };
-
 
 module.exports.createOrder = async (req, res) => {
   try {
@@ -95,7 +91,6 @@ module.exports.addToOrder = async (req, res) => {
     const bill = computeBill(order);
 
     order.subtotal = bill.subtotal;
-    order.discount = bill.discount;
     order.grandTotal = bill.grandTotal;
 
     const updatedOrder = await order.save();
@@ -132,7 +127,6 @@ module.exports.updateOrder = async (req, res) => {
     const bill = computeBill(order);
 
     order.subtotal = bill.subtotal;
-    order.discount = bill.discount;
     order.grandTotal = bill.grandTotal;
 
     const updatedOrder = await order.save();
@@ -179,7 +173,6 @@ module.exports.updateItemQuantity = async (req, res) => {
     const bill = computeBill(order);
 
     order.subtotal = bill.subtotal;
-    order.discount = bill.discount;
     order.grandTotal = bill.grandTotal;
 
     const updatedOrder = await order.save();
@@ -250,7 +243,7 @@ module.exports.markAsBilled = async (req, res) => {
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
-
+ 
     // save cash
     order.cash = Number(cash || 0);
 
@@ -318,5 +311,34 @@ module.exports.applyDiscount = async (req, res) => {
     return res.status(200).json(updated);
   } catch (err) {
     return res.status(500).json({ message: err.message });
+  }
+};
+
+module.exports.cancelOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        message: "Order not found",
+      });
+    }
+
+    // allow cancelling even if billed
+    order.status = "cancelled";
+
+    const updatedOrder = await order.save();
+
+    return res.status(200).json({
+      message: "Order cancelled successfully",
+      order: updatedOrder,
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 };
