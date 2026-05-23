@@ -16,6 +16,11 @@ router.post("/", verify, orderController.createOrder);
 // ==============================
 router.get("/", verify, orderController.getAllOrders);
 
+router.get(
+  "/today",
+  verify,
+  orderController.getTodayOrders
+);
 // ==============================
 // GET SINGLE ORDER
 // ==============================

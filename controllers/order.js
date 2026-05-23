@@ -26,6 +26,39 @@ const computeBill = (order) => {
   };
 };
 
+module.exports.getAllOrders = async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ createdAt: -1 });
+    res.status(200).json(orders);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+module.exports.getTodayOrders = async (req, res) => {
+  try {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+
+    const orders = await Order.find({
+      createdAt: {
+        $gte: start,
+        $lte: end,
+      },
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json(orders);
+
+  } catch (err) {
+    res.status(500).json({
+      message: err.message,
+    });
+  }
+};
+
 module.exports.createOrder = async (req, res) => {
   try {
     const { staffName, orderName, serviceType, pax } = req.body;
@@ -201,14 +234,7 @@ module.exports.removeOrder = async (req, res) => {
   }
 };
 
-module.exports.getAllOrders = async (req, res) => {
-  try {
-    const orders = await Order.find().sort({ createdAt: -1 });
-    res.status(200).json(orders);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+
 
 // ==============================
 // 7. GET SINGLE ORDER
