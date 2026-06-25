@@ -50,7 +50,7 @@ router.patch("/:orderId/bill", verify, orderController.markAsBilled);
 router.put("/:orderId/discount", verify, orderController.applyDiscount);
 
 router.put("/:orderId/cancel", verify, orderController.cancelOrder);
-
+router.post("/late", verify,  orderController.createLateOrder);
 // ==============================
 // EXPORT ROUTER
 // ==============================

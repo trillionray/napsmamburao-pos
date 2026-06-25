@@ -1,6 +1,5 @@
 const Order = require("../models/Order");
 
-
 const computeBill = (order) => {
   const ordered = Array.isArray(order.ordered) ? order.ordered : [];
 
@@ -25,6 +24,56 @@ const computeBill = (order) => {
     discountAmount, // 👈 ADD THIS
   };
 };
+
+
+module.exports.createLateOrder = async (req, res) => {
+  try {
+    const {
+      staffName,
+      orderName,
+      serviceType,
+      pax,
+      timestamp, // custom date/time
+    } = req.body;
+
+    if (!staffName || !orderName || !serviceType || !timestamp) {
+      return res.status(400).json({
+        message: "Missing required fields",
+      });
+    }
+
+    const customDate = new Date(timestamp);
+
+    if (isNaN(customDate.getTime())) {
+      return res.status(400).json({
+        message: "Invalid timestamp",
+      });
+    }
+
+    const newOrder = new Order({
+      staffName,
+      orderName,
+      serviceType,
+      ordered: [],
+      subtotal: 0,
+      discount: 0,
+      grandTotal: 0,
+      pax,
+      createdAt: customDate,
+      updatedAt: customDate,
+    });
+
+    const savedOrder = await newOrder.save();
+
+    res.status(201).json(savedOrder);
+
+  } catch (err) {
+    res.status(500).json({
+      message: err.message,
+    });
+  }
+};
+
 
 module.exports.getAllOrders = async (req, res) => {
   try {
@@ -233,8 +282,6 @@ module.exports.removeOrder = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
-
 
 // ==============================
 // 7. GET SINGLE ORDER
